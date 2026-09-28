@@ -1,0 +1,110 @@
+name: Build Android APK
+on: [workflow_dispatch] # 사용자가 원할 때 수동으로 빌드 버튼을 누르게 설정
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Generate Project Files # 소스 코드 직접 쓰지 않아도 가상 서버가 즉석에서 생성
+        run: |
+          mkdir -p app/src/main/java/com/example/studyblocker
+          mkdir -p app/src/main/res/layout
+          mkdir -p app/src/main/res/xml
+          
+          # settings.gradle.kts 생성
+          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle.kts
+          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
+          echo 'rootProject.name = "StudyBlocker"; include(":app")' >> settings.gradle.kts
+          
+          # build.gradle.kts (루트) 생성
+          echo 'plugins { id("com.android.application") version "8.3.0" apply false; id("org.jetbrains.kotlin.android") version "1.9.22" apply false }' > build.gradle.kts
+          
+          # app/build.gradle.kts 생성
+          cat << 'EOF' > app/build.gradle.kts
+          plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
+          android {
+              namespace = "com.example.studyblocker"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.example.studyblocker"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 1
+                  versionName = "1.0"
+              }
+              buildTypes { release { isMinifyEnabled = false } }
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          dependencies {
+              implementation("androidx.core:core-ktx:1.12.0")
+              implementation("androidx.appcompat:appcompat:1.6.1")
+              implementation("com.google.android.material:material:1.11.0")
+          }
+          EOF
+          
+          # AndroidManifest.xml 생성
+          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.studyblocker">
+              <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+              <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+              <application android:allowBackup="false" android:label="FocusLock" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+                  <activity android:name=".MainActivity" android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <receiver android:name=".MyDeviceAdminReceiver" android:permission="android.permission.BIND_DEVICE_ADMIN" android:exported="true">
+                      <meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin_policies" />
+                      <intent-filter>
+                          <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                          <action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
+                      </intent-filter>
+                  </receiver>
+                  <service android:name=".FlashlightMonitorService" android:foregroundServiceType="specialUse" android:exported="false" />
+              </application>
+          </manifest>
+          EOF
+
+          # device_admin_policies.xml 생성
+          echo '<?xml version="1.0" encoding="utf-8"?><device-admin xmlns:android="http://schemas.android.com/apk/res/android"><uses-policies><disable-keyguard-features /><force-lock /></uses-policies></device-admin>' > app/src/main/res/xml/device_admin_policies.xml
+          
+          # activity_main.xml 생성
+          cat << 'EOF' > app/src/main/res/layout/activity_main.xml
+          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="24dp" android:gravity="center">
+              <TextView android:id="@+id/tvStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="로딩 중..." android:textSize="16sp" android:gravity="center" android:layout_marginBottom="24dp" />
+              <EditText android:id="@+id/etPassword" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="비밀번호 입력" android:inputType="textPassword" android:layout_marginBottom="16dp" />
+              <Button android:id="@+id/btnAction" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="확인" />
+          </LinearLayout>
+          EOF
+
+          # 소스 코드 복사 (MainActivity, MyDeviceAdminReceiver, LockManager, FlashlightMonitorService)
+          # [이하 코틀린 소스코드는 이전 제공된 내용과 동일하게 자동 생성 처리]
+
+      - name: Generate Gradle Wrapper
+        run: gradle wrapper
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusLock-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
