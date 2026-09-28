@@ -14,11 +14,11 @@ jobs:
           java-version: '17'
           distribution: 'zulu'
 
-      # [중요] 깃허브 캐시 서버가 먹통일 때 빌드가 실패하는 것을 완벽 방지하기 위해 캐시 기능 차단
+      # 깃허브 캐시 서버가 먹통일 때 빌드가 실패하는 것을 완벽 방지하기 위해 캐시 기능 차단
       - name: Setup Gradle without Caching
         uses: gradle/actions/setup-gradle@v3
         with:
-          cache-disabled: true # 깃허브 캐시 에러가 발생해도 빌드를 그대로 완수하게 함
+          cache-disabled: true
 
       - name: Generate Project Files
         run: |
@@ -134,13 +134,13 @@ jobs:
           </LinearLayout>
           EOF
 
-          # 7. MyDeviceAdminReceiver.kt 생성
+          # 7. MyDeviceAdminReceiver.kt 생성 (중복 import 오타 수정 완료!)
           cat << 'EOF' > app/src/main/java/com/example/studyblocker/MyDeviceAdminReceiver.kt
           package com.example.studyblocker
           import android.app.admin.DeviceAdminReceiver
           import android.content.ComponentName
           import android.content.Context
-          import import android.content.Intent
+          import android.content.Intent
           import android.widget.Toast
           class MyDeviceAdminReceiver : DeviceAdminReceiver() {
               companion object {
@@ -380,7 +380,6 @@ jobs:
           }
           EOF
 
-      # [수정 사항] 누락되었던 실행용 Gradle Wrapper 파일을 가상 서버가 자체 생산하게 함
       - name: Build and Initialize Gradle Wrapper
         run: |
           npm install -g gradle
