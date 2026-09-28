@@ -1,5 +1,5 @@
 name: Build Android APK
-on: [workflow_dispatch] # Actions 탭에서 수동 실행 버튼 활성화
+on: [workflow_dispatch] # 수동 실행 트리거 제공
 
 jobs:
   build:
@@ -12,7 +12,13 @@ jobs:
         uses: actions/setup-java@v4
         with:
           java-version: '17'
-          distribution: 'zulu' # 안정적인 Zulu JDK 사용
+          distribution: 'zulu'
+
+      # [중요] 깃허브 캐시 서버가 먹통일 때 빌드가 실패하는 것을 완벽 방지하기 위해 캐시 기능 차단
+      - name: Setup Gradle without Caching
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          cache-disabled: true # 깃허브 캐시 에러가 발생해도 빌드를 그대로 완수하게 함
 
       - name: Generate Project Files
         run: |
@@ -128,13 +134,13 @@ jobs:
           </LinearLayout>
           EOF
 
-          # 7. Kotlin 소스코드 생성 (MyDeviceAdminReceiver)
+          # 7. MyDeviceAdminReceiver.kt 생성
           cat << 'EOF' > app/src/main/java/com/example/studyblocker/MyDeviceAdminReceiver.kt
           package com.example.studyblocker
           import android.app.admin.DeviceAdminReceiver
           import android.content.ComponentName
           import android.content.Context
-          import android.content.Intent
+          import import android.content.Intent
           import android.widget.Toast
           class MyDeviceAdminReceiver : DeviceAdminReceiver() {
               companion object {
@@ -149,7 +155,7 @@ jobs:
           }
           EOF
 
-          # 8. Kotlin 소스코드 생성 (LockManager)
+          # 8. LockManager.kt 생성
           cat << 'EOF' > app/src/main/java/com/example/studyblocker/LockManager.kt
           package com.example.studyblocker
           import android.app.admin.DevicePolicyManager
@@ -204,7 +210,7 @@ jobs:
           }
           EOF
 
-          # 9. Kotlin 소스코드 생성 (FlashlightMonitorService)
+          # 9. FlashlightMonitorService.kt 생성
           cat << 'EOF' > app/src/main/java/com/example/studyblocker/FlashlightMonitorService.kt
           package com.example.studyblocker
           import android.app.Notification
@@ -280,7 +286,7 @@ jobs:
           }
           EOF
 
-          # 10. Kotlin 소스코드 생성 (MainActivity)
+          # 10. MainActivity.kt 생성
           cat << 'EOF' > app/src/main/java/com/example/studyblocker/MainActivity.kt
           package com.example.studyblocker
           import android.app.admin.DevicePolicyManager
@@ -374,26 +380,16 @@ jobs:
           }
           EOF
 
-      # 11. 안정성이 보장된 Gradle 8.4 버전으로 래퍼 설치
-      - name: Setup Gradle Wrapper (v8.4)
+      # [수정 사항] 누락되었던 실행용 Gradle Wrapper 파일을 가상 서버가 자체 생산하게 함
+      - name: Build and Initialize Gradle Wrapper
         run: |
           npm install -g gradle
           gradle wrapper --gradle-version 8.4
+          chmod +x gradlew
 
-      # 12. Gradle 빌드 도구 최적화 캐싱 세팅
-      - name: Setup Gradle environment
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: 8.4
-
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
-
-      # 13. 클라우드 빌드 진행
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # 14. 결과 파일 업로드
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
